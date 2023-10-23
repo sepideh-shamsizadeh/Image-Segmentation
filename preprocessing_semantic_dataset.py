@@ -3,19 +3,22 @@ import tensorflow as tf
 import semantic_visualization
 
 
-def make_image_mask(images_file, annotations_file, class_names, width=224, height=224):
+def make_image_mask(images_file, annotations_file, width=224, height=224):
     # Convert image and mask files to tensors
     image_data = tf.io.read_file(images_file)
     annotation_data = tf.io.read_file(annotations_file)
     image = tf.image.decode_jpeg(image_data)
     annotation = tf.image.decode_jpeg(annotation_data)
 
+    class_names = ['sky', 'building', 'column/pole', 'road', 'side walk', 'vegetation', 'traffic light', 'fence',
+                'vehicle', 'pedestrian', 'byciclist', 'void']
+    
     # Resize image and segmentation mask
-    image = tf.image.resize(image, (height, width))
-    annotation = tf.image.resize(annotation, (height, width))
-    image = tf.reshape(image, (height, width, 3))
+    image = tf.image.resize(image, (height, width, ))
+    annotation = tf.image.resize(annotation, (height, width, ))
+    image = tf.reshape(image, (height, width, 3, ))
     annotation = tf.cast(annotation, dtype=tf.int32)
-    annotation = tf.reshape(annotation, (height, width, 1))
+    annotation = tf.reshape(annotation, (height, width, 1, ))
     stack_list = []
 
     # Reshape segmentation masks
@@ -28,7 +31,7 @@ def make_image_mask(images_file, annotations_file, class_names, width=224, heigh
     image = image / 127.5
     image -= 1
 
-    return image, annotation, class_names
+    return image, annotation
 
 
 def get_dataset_paths(image_dir, label_dir):
@@ -40,7 +43,7 @@ def get_dataset_paths(image_dir, label_dir):
 def get_data(image_paths, labels_paths, class_names, train):
     BATCH_SIZE = 64
     dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels_paths))
-    dataset = dataset.map(lambda x, y: make_image_mask(x, y, class_names))
+    dataset = dataset.map(make_image_mask)
     if train:
         dataset = dataset.shuffle(100, reshuffle_each_iteration=True)
     dataset = dataset.batch(BATCH_SIZE)
