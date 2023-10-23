@@ -159,4 +159,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 dataset1/*
-
+vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5
