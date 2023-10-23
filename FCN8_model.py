@@ -1,32 +1,34 @@
 import tensorflow as tf
 
+
+
 def VGG_16(image_input):
     x = tf.keras.layers.Conv2D(filters=64, kernel_size=(3,3), activation='relu', padding='same', name='conv1-1')(image_input)
     x = tf.keras.layers.Conv2D(filters=64, kernel_size=(3,3), activation='relu', padding='same', name='conv1-2')(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2), name='max1')(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), name='max1')(x)
     p1 = x
 
     x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3,3), activation='relu', padding='same', name='conv2-1')(x)
     x = tf.keras.layers.Conv2D(filters=128, kernel_size=(3,3), activation='relu', padding='same', name='conv2-2')(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2), name='max1')(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), name='max2')(x)
     p2 = x
 
     x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3,3), activation='relu', padding='same', name='conv3-1')(x)
     x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3,3), activation='relu', padding='same', name='conv3-2')(x)
     x = tf.keras.layers.Conv2D(filters=256, kernel_size=(3,3), activation='relu', padding='same', name='conv3-3')(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2), name='max1')(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), name='max3')(x)
     p3 = x
 
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=(3,3), activation='relu', padding='same', name='conv4-1')(x)
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=(3,3), activation='relu', padding='same', name='conv4-2')(x)
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=(3,3), activation='relu', padding='same', name='conv4-3')(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2), name='max1')(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), name='max4')(x)
     p4 = x
 
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=(3,3), activation='relu', padding='same', name='conv5-1')(x)
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=(3,3), activation='relu', padding='same', name='conv5-2')(x)
     x = tf.keras.layers.Conv2D(filters=512, kernel_size=(3,3), activation='relu', padding='same', name='conv5-3')(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=(3,3), strides=(2,2), name='max1')(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2), strides=(2,2), name='max5')(x)
     p5 = x
 
     vgg = tf.keras.Model(image_input, p5)
@@ -43,3 +45,50 @@ def VGG_16(image_input):
     return (p1, p2, p3, p4, c7)
 
 
+def fcn8_decoder(convs, n_classes):
+    f1, f2, f3, f4, f5 = convs
+  
+    # upsample the output of the encoder then crop extra pixels that were introduced
+    o = tf.keras.layers.Conv2DTranspose(n_classes , kernel_size=(4,4) ,  strides=(2,2) , use_bias=False )(f5)
+    o = tf.keras.layers.Cropping2D(cropping=(1,1))(o)
+
+    # load the pool 4 prediction and do a 1x1 convolution to reshape it to the same shape of `o` above
+    o2 = f4
+    o2 = ( tf.keras.layers.Conv2D(n_classes , ( 1 , 1 ) , activation='relu' , padding='same'))(o2)
+
+    # add the results of the upsampling and pool 4 prediction
+    o = tf.keras.layers.Add()([o, o2])
+    print(o.shape)
+    # upsample the resulting tensor of the operation you just did
+    o = (tf.keras.layers.Conv2DTranspose( n_classes , kernel_size=(4,4) ,  strides=(2,2) , use_bias=False ))(o)
+    o = tf.keras.layers.Cropping2D(cropping=(1, 1))(o)
+
+    # load the pool 3 prediction and do a 1x1 convolution to reshape it to the same shape of `o` above
+    o2 = f3
+    o2 = ( tf.keras.layers.Conv2D(n_classes , ( 1 , 1 ) , activation='relu' , padding='same'))(o2)
+
+    # add the results of the upsampling and pool 3 prediction
+    o = tf.keras.layers.Add()([o, o2])
+    
+    # upsample up to the size of the original image
+    o = tf.keras.layers.Conv2DTranspose(n_classes , kernel_size=(8,8) ,  strides=(8,8) , use_bias=False )(o)
+
+    # append a softmax to get the class probabilities
+    o = (tf.keras.layers.Activation('softmax'))(o)
+
+    return o 
+
+
+def segmentation():
+
+    inputs = tf.keras.layers.Input(shape=(224,224,3,))
+    convs = VGG_16(image_input=inputs)
+    outputs = fcn8_decoder(convs, 12)
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
+    
+    return model
+
+if __name__ == '__main__':
+
+    model = segmentation()
+    print(model.summary)
