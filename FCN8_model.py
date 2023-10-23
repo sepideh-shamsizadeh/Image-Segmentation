@@ -88,7 +88,9 @@ def segmentation():
     
     return model
 
-if __name__ == '__main__':
+
+
+def train_model(training_dataset, validation_dataset):
     model = segmentation()
     print(model.summary)
     sgd = tf.keras.optimizers.SGD(learning_rate=1E-2, momentum=0.9, nesterov=True)
@@ -108,25 +110,26 @@ if __name__ == '__main__':
     steps_per_epoch = train_count//BATCH_SIZE
     validation_steps = validation_count//BATCH_SIZE
 
-    class_names = ['sky', 'building', 'column/pole', 'road', 'side walk', 'vegetation', 'traffic light', 'fence',
-                'vehicle', 'pedestrian', 'byciclist', 'void']
-    
+    print(training_dataset.take(1))
+    print(validation_dataset.take(1))
+    history = model.fit(training_dataset, 
+                        steps_per_epoch=steps_per_epoch, validation_data=validation_dataset, validation_steps=validation_steps, epochs=EPOCHS)
+    return model
+
+if __name__ == '__main__':
+
     timage_path = 'dataset1/images_prepped_train/'
     tlabel_path = 'dataset1/annotations_prepped_train/'
 
     timage_paths, tlabels_paths = pc.get_dataset_paths(timage_path, tlabel_path)
-    training_dataset = pc.get_data(timage_paths, tlabels_paths, class_names, True)
+    training_dataset = pc.get_data(timage_paths, tlabels_paths, True)
 
     # trainV = pc.semantic_visualization.Visualization(training_dataset, 9)
 
     vimage_path = 'dataset1/images_prepped_test/'
     vlabel_path = 'dataset1/annotations_prepped_test/'
     vimage_paths, vlabels_paths = pc.get_dataset_paths(vimage_path, vlabel_path)
-    validation_dataset = pc.get_data(vimage_paths, vlabels_paths, class_names, False)
-
+    validation_dataset = pc.get_data(vimage_paths, vlabels_paths, False)
     # validationV = pc.semantic_visualization.Visualization(validation_dataset, 9)
 
-    print(training_dataset.take(1))
-    print(validation_dataset.take(1))
-    history = model.fit(training_dataset, 
-                        steps_per_epoch=steps_per_epoch, validation_data=validation_dataset, validation_steps=validation_steps, epochs=EPOCHS)
+    model = train_model(training_dataset, validation_dataset)

@@ -40,7 +40,7 @@ def get_dataset_paths(image_dir, label_dir):
     return image_paths, labels_paths
 
 
-def get_data(image_paths, labels_paths, class_names, train):
+def get_data(image_paths, labels_paths, train):
     BATCH_SIZE = 64
     dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels_paths))
     dataset = dataset.map(make_image_mask)
@@ -56,9 +56,6 @@ def get_data(image_paths, labels_paths, class_names, train):
 if __name__ == '__main__':
     timage_path = 'dataset1/images_prepped_train/'
     tlabel_path = 'dataset1/annotations_prepped_train/'
-    class_names = ['sky', 'building', 'column/pole', 'road', 'side walk', 'vegetation', 'traffic light', 'fence',
-                   'vehicle', 'pedestrian', 'byciclist', 'void']
     timage_paths, tlabels_paths = get_dataset_paths(timage_path, tlabel_path)
-    training_dataset = get_data(timage_paths, tlabels_paths, class_names, True)
-
+    training_dataset = get_data(timage_paths, tlabels_paths, True)
     trainV = semantic_visualization.Visualization(training_dataset, 9)
