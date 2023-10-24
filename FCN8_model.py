@@ -91,7 +91,7 @@ def segmentation():
 
 
 
-def train_model(training_dataset, validation_dataset):
+def train_model(training_dataset, validation_dataset, validation_steps):
 
     model = segmentation()
     print(model.summary)
@@ -106,7 +106,7 @@ def train_model(training_dataset, validation_dataset):
 
 
     EPOCHS = 170
-    BATCH_SIZE = 64
+    BATCH_SIZE = 16
 
     steps_per_epoch = train_count//BATCH_SIZE
 
@@ -158,13 +158,13 @@ def IOU_diceScore(y_true, y_pred):
     return class_wise_iou, class_wise_dice_score
 
 
-if __name__ == '__main__':
 
+def main():
     timage_path = 'dataset1/images_prepped_train/'
     tlabel_path = 'dataset1/annotations_prepped_train/'
     class_names = ['sky', 'building','column/pole', 'road', 'side walk', 'vegetation', 'traffic light', 'fence', 'vehicle', 'pedestrian', 'byciclist', 'void']
     
-    BATCH_SIZE = 64
+    BATCH_SIZE = 16
     
     dp = pc.DataPreprocessing(timage_path, tlabel_path, class_names, True, bacth_size=BATCH_SIZE)
     training_dataset = dp.get_data()
@@ -177,12 +177,16 @@ if __name__ == '__main__':
     validation_dataset = dp.get_data()
     validationV = pc.semantic_visualization.Visualization(validation_dataset, 9, class_names)
 
-    model = train_model(training_dataset, validation_dataset)
-    y_true_images, y_true_segments = evaluate_model(validation_dataset)
-    
     # number of validation images
     validation_count = 101
+
     validation_steps = validation_count//BATCH_SIZE
+
+
+    model = train_model(training_dataset, validation_dataset, validation_steps)
+    y_true_images, y_true_segments = evaluate_model(validation_dataset)
+    
+    
 
     results = model.predict(validation_dataset, steps=validation_steps)
 
@@ -206,3 +210,8 @@ if __name__ == '__main__':
     for idx, dice_score in enumerate(cls_wise_dice_score):
         spaces = ' ' * (13-len(class_names[idx]) + 2)
         print("{}{}{} ".format(class_names[idx], spaces, dice_score))
+
+
+if __name__ == '__main__':
+
+    main()
