@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 import preprocessing_semantic_dataset as pc
 
@@ -91,6 +92,7 @@ def segmentation():
 
 
 def train_model(training_dataset, validation_dataset):
+
     model = segmentation()
     print(model.summary)
     sgd = tf.keras.optimizers.SGD(learning_rate=1E-2, momentum=0.9, nesterov=True)
@@ -101,35 +103,106 @@ def train_model(training_dataset, validation_dataset):
     # number of training images
     train_count = 367
 
-    # number of validation images
-    validation_count = 101
+
 
     EPOCHS = 170
     BATCH_SIZE = 64
 
     steps_per_epoch = train_count//BATCH_SIZE
-    validation_steps = validation_count//BATCH_SIZE
 
     print(training_dataset.take(1))
     print(validation_dataset.take(1))
     history = model.fit(training_dataset, 
                         steps_per_epoch=steps_per_epoch, validation_data=validation_dataset, validation_steps=validation_steps, epochs=EPOCHS)
+    
+    print(history)
     return model
+
+def evaluate_model(validation_dataset):
+    y_true_segments = []
+    y_true_images = []
+    test_count = 64
+
+    ds = validation_dataset.unbatch()
+    ds = ds.batch(101)
+
+    for image, annotation in ds.take(1):
+        y_true_images = image
+        y_true_segments = annotation
+
+
+    y_true_segments = y_true_segments[:test_count, : ,: , :]
+    y_true_segments = np.argmax(y_true_segments, axis=3)  
+
+    return y_true_images, y_true_segments
+
+
+def IOU_diceScore(y_true, y_pred):
+    class_wise_iou = []
+    class_wise_dice_score = []
+
+    smoothening_factor = 0.00001
+
+    for i in range(12):
+        intersection = np.sum((y_pred==i) * (y_true==i))
+        y_true_area = np.sum((y_true==1))
+        y_pred_area = np.sum((y_pred==i))
+        combined_area = y_true_area + y_pred_area
+
+        iou = (intersection + smoothening_factor) / (combined_area-intersection+smoothening_factor)
+        class_wise_iou.append(iou)
+
+        dice_score = 2 * ((intersection+smoothening_factor)) / (combined_area + smoothening_factor)
+        class_wise_dice_score.append(dice_score)
+
+    return class_wise_iou, class_wise_dice_score
+
 
 if __name__ == '__main__':
 
     timage_path = 'dataset1/images_prepped_train/'
     tlabel_path = 'dataset1/annotations_prepped_train/'
+    class_names = ['sky', 'building','column/pole', 'road', 'side walk', 'vegetation', 'traffic light', 'fence', 'vehicle', 'pedestrian', 'byciclist', 'void']
+    
+    BATCH_SIZE = 64
+    
+    dp = pc.DataPreprocessing(timage_path, tlabel_path, class_names, True, bacth_size=BATCH_SIZE)
+    training_dataset = dp.get_data()
 
-    timage_paths, tlabels_paths = pc.get_dataset_paths(timage_path, tlabel_path)
-    training_dataset = pc.get_data(timage_paths, tlabels_paths, True)
-
-    # trainV = pc.semantic_visualization.Visualization(training_dataset, 9)
+    trainV = pc.semantic_visualization.Visualization(training_dataset, 9, class_names)
 
     vimage_path = 'dataset1/images_prepped_test/'
     vlabel_path = 'dataset1/annotations_prepped_test/'
-    vimage_paths, vlabels_paths = pc.get_dataset_paths(vimage_path, vlabel_path)
-    validation_dataset = pc.get_data(vimage_paths, vlabels_paths, False)
-    # validationV = pc.semantic_visualization.Visualization(validation_dataset, 9)
+    dp = pc.DataPreprocessing(vimage_path, vlabel_path, class_names, False, bacth_size=BATCH_SIZE)
+    validation_dataset = dp.get_data()
+    validationV = pc.semantic_visualization.Visualization(validation_dataset, 9, class_names)
 
     model = train_model(training_dataset, validation_dataset)
+    y_true_images, y_true_segments = evaluate_model(validation_dataset)
+    
+    # number of validation images
+    validation_count = 101
+    validation_steps = validation_count//BATCH_SIZE
+
+    results = model.predict(validation_dataset, steps=validation_steps)
+
+    # for each pixel, get the slice number which has the highest probability
+    results = np.argmax(results, axis=3)
+    # input a number from 0 to 63 to pick an image from the test set
+    integer_slider = 0
+
+    # compute metrics
+    iou, dice_score = IOU_diceScore(y_true_segments[integer_slider], results[integer_slider])  
+
+    # visualize the output and metrics
+    validationV.semantic_visualization.show_predictions(y_true_images[integer_slider], [results[integer_slider], y_true_segments[integer_slider]], ["Image", "Predicted Mask", "True Mask"], iou, dice_score)
+    cls_wise_iou, cls_wise_dice_score = IOU_diceScore(y_true_segments, results)
+    # print IOU for each class
+    for idx, iou in enumerate(cls_wise_iou):
+        spaces = ' ' * (13-len(class_names[idx]) + 2)
+        print("{}{}{} ".format(class_names[idx], spaces, iou)) 
+
+    # print the dice score for each class
+    for idx, dice_score in enumerate(cls_wise_dice_score):
+        spaces = ' ' * (13-len(class_names[idx]) + 2)
+        print("{}{}{} ".format(class_names[idx], spaces, dice_score))
